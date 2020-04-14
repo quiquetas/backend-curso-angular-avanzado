@@ -15,7 +15,7 @@ app.get('/', (req, res, next) => {
     var desde = req.query.desde || 0;
     desde = Number(desde);
 
-    Usuario.find({}, 'nombre email img role')
+    Usuario.find({}, 'nombre email img role google')
         .skip(desde)
         .limit(5)
         .exec((err, usuarios) => {
@@ -61,6 +61,16 @@ app.put('/:id', mdAuth.verifyToken, (req, res) => {
             });
         }
 
+        // Si el usuario es de Google, no se le permite cambiar el email
+        // Si fuera necesario permitírselo, habría que pedirle que defina contraseña
+        if (usuario.google && body.email !== usuario.email) {
+            return res.status(400).json({
+                ok: false,
+                message: 'No puede cambiar el email',
+                errors: { message: 'No puede cambiar el email al ser un usuario de Google' }
+            });
+        }
+
         usuario.nombre = body.nombre;
         usuario.email = body.email;
         usuario.role = body.role;
@@ -87,7 +97,7 @@ app.put('/:id', mdAuth.verifyToken, (req, res) => {
 // ===========================================
 // Crear un nuevo usuario
 // ===========================================
-app.post('/', mdAuth.verifyToken, (req, res) => {
+app.post('/', (req, res) => {
     var body = req.body;
 
     var usuario = new Usuario({
@@ -122,6 +132,15 @@ app.post('/', mdAuth.verifyToken, (req, res) => {
 // ===========================================
 app.delete('/:id', mdAuth.verifyToken, (req, res) => {
     var id = req.params.id;
+
+    // El usuario identificado con el token no puede borrarse a sí mismo.
+    if (req.usuario._id === id) {
+        return res.status(400).json({
+            ok: false,
+            message: 'No puede borrarse a sí mismo',
+            errors: { message: 'No puede borrarse a sí mismo' }
+        });
+    }
 
     Usuario.findByIdAndRemove(id, (err, usuarioBorrado) => {
         if (err) {
